@@ -121,8 +121,10 @@ fn main() {
                 cast,
             });
     }
-
-    game(&movie_casts, &actresses, &actors, Player::Veronique);
+    let first_choice = actresses.first();
+    if first_choice.is_some(){
+        game(&movie_casts, &actresses, &actors, Player::Veronique, "BradPitt");
+    }
 }
 
 fn game(movies: &Vec<Movies>, actresses: &Vec<String>, actors: &Vec<String>, player: Player, turn: &str) -> Option<Player> {
@@ -142,14 +144,17 @@ fn new_new_move(movies: &Vec<Movies>, possible_actors: &Vec<String>, possible_ac
         for y in possible_actresses {
             let c = movies
                 .iter()
-                .filter_map(|m| {
-                    if m.cast.contains(y) && m.cast.contains(turn) {
-                        let n =  possible_actresses.clone();
-                        n.iter().enumerate().find(|(c, acc)| )
-                        game(movies,)
-                    }
-                })
+                .filter(|m|  m.cast.contains(y) && m.cast.contains(turn)).collect::<Vec<&Movies>>();
+            print!("{}", c.len());
+            if  c.len() > 0{
+                let n =  possible_actresses.clone();
+                n.iter().filter(|x| x.ne(&y));
+                print!("test123") ;
+                let result = game(movies,&n, possible_actors, Player::Mark, y);
+                return result;
+            }
         }
+        return None;
     } else {
 
     }
@@ -160,31 +165,31 @@ fn new_movie(movies: &Vec<Movies>, possible_actors: &Vec<String>, possible_actre
     let mut _index: usize = 0;
     let mut result: Vec<Movies> = vec![];
     for movie in movies {
-        for actor in movie.cast {
+        for actor in possible_actors {
             if turn == Player::Mark {
                 for possible in possible_actors.iter() {
-                    if &actor == possible {
+                    if actor == possible {
                         possible_actors.clone().remove(_index);
                         for m in all_movies.iter() {
-                            if m.cast.contains(&actor) {
+                            if m.cast.contains(actor) {
                                 result.push(m.clone());
                             }
                         }
-                        game(result, possible_actresses.clone(), possible_actors.clone(), "Veronique", all_movies.clone());
+                        //game(result, possible_actresses.clone(), possible_actors.clone(), "Veronique", all_movies.clone());
                         break;
                     }
                     _index = _index + 1;
                 }
-            } else if turn == "Veronique" {
+            } else if turn == Player::Veronique {
                 for possible in possible_actresses.iter() {
-                    if &actor == possible {
+                    if actor == possible {
                         possible_actresses.clone().remove(_index);
                         for m in all_movies.iter() {
-                            if m.cast.contains(&actor) {
+                            if m.cast.contains(actor) {
                                 result.push(m.clone());
                             }
                         }
-                        game(result.clone(), possible_actresses.clone(), possible_actors.clone(), "Mark", all_movies.clone());
+                        //game(result.clone(), possible_actresses.clone(), possible_actors.clone(), "Mark", all_movies.clone());
                         break;
                     }
                     _index = _index + 1;
