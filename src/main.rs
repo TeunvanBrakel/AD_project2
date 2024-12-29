@@ -1,9 +1,7 @@
-use std::cmp::PartialEq;
-use std::collections::HashSet;
-use std::fmt::{Debug, Display};
-use std::hash::Hash;
+use std::collections::{HashMap, VecDeque};
 use std::io::{stdin, BufRead, BufReader};
-use std::str::{FromStr, SplitWhitespace};
+use std::str::SplitWhitespace;
+use std::usize;
 
 struct Input<B> {
     inner: B,
@@ -29,13 +27,17 @@ impl<B: BufRead> Input<B> {
     pub fn string(&mut self) -> String {
         self.buffer.clear();
         self.inner.read_line(&mut self.buffer).unwrap();
-        self.buffer.to_string()
+        self.buffer.trim().to_string()
     }
 
-    fn parse<T: FromStr>(&mut self) -> T
+    pub fn skip(&mut self) {
+        let _ = self.inner.read_line(&mut self.buffer);
+    }
+
+    fn parse<T: std::str::FromStr>(&mut self) -> T
     where
-        T: FromStr,
-        T::Err: Debug,
+        T: std::str::FromStr,
+        T::Err: std::fmt::Debug,
     {
         self.string().trim().parse::<T>().unwrap()
     }
@@ -46,52 +48,119 @@ struct Line<'a> {
 }
 
 impl<'a> Line<'a> {
-    fn next<T: FromStr>(&mut self) -> T
+    fn next<T: std::str::FromStr>(&mut self) -> T
     where
-        T: FromStr,
-        T::Err: Debug,
+        T: std::str::FromStr,
+        T::Err: std::fmt::Debug,
     {
-        self
-            .split
-            .next()
-            .unwrap()
-            .parse::<T>()
-            .unwrap()
+        self.split.next().unwrap().parse::<T>().unwrap()
     }
-    fn pair<T: FromStr>(&mut self) -> (T, T)
+
+    fn pair<T: std::str::FromStr>(&mut self) -> (T, T)
     where
-        T: FromStr,
-        T::Err: Debug,
+        T: std::str::FromStr,
+        T::Err: std::fmt::Debug,
     {
         (self.next(), self.next())
     }
-    fn collect<T: FromStr>(self) -> Vec<T>
-    where
-        T: FromStr,
-        T::Err: Debug,
-    {
-        self
-            .split
-            .map(|d| d.parse::<T>().unwrap())
-            .collect::<Vec<T>>()
+}
+
+const NIL: usize = 0; // Using 0 as NIL to represent unmatched nodes
+const INF: usize = usize::MAX;
+
+struct BipartiteGraph {
+    adj_list: Vec<Vec<usize>>,
+}
+
+impl BipartiteGraph {
+    fn with_capacity(n: usize) -> BipartiteGraph {
+        BipartiteGraph {
+            adj_list: vec![vec![]; n],
+        }
+    }
+
+    fn add_edge(&mut self, u: usize, v: usize) {
+        self.adj_list[u].push(v);
     }
 }
-#[derive(Clone)]
-struct Actors {
-    name: String,
-    movies: HashSet<String>,
+
+struct HopcroftKarp {
+    pair_u: Vec<usize>,
+    pair_v: Vec<usize>,
+    dist: Vec<usize>,
 }
 
-#[derive(Clone)]
-struct Movies {
-    title: String,
-    cast: HashSet<String>,
-}
+impl HopcroftKarp {
+    fn with_capacity(n: usize) -> Self {
+        HopcroftKarp {
+            // + 1 for later appended the sink
+            pair_u: vec![NIL; n + 1],
+            pair_v: vec![NIL; n + 1],
+            dist: vec![INF; n + 1],
+        }
+    }
 
-#[derive(Eq, PartialEq)]
-enum Player {
-    Veronique,
-    Mark,
+    fn bfs(&mut self, graph: &BipartiteGraph) -> bool {
+        let mut queue: VecDeque<usize> = VecDeque::new();
+
+        //Since we can assume left and right are identical otherwise use std:cmp::min(self.pair_u.len(), self.pair_v.len())
+        for u in 1..self.pair_u.len() {
+            if self.pair_u[u] == NIL {
+                self.dist[u] = 0;
+                queue.push_back(u);
+            } else {
+                self.dist[u] = INF;
+            }
+        }
+
+        self.dist[NIL] = INF;
+
+        while let Some(u) = queue.pop_front() {
+            if self.dist[u] < self.dist[NIL] {
+                for &v in &graph.adj_list[u] {
+                    let pair_v = self.pair_v[v];
+                    if self.dist[pair_v] == INF {
+                        self.dist[pair_v] = self.dist[u] + 1;
+                        queue.push_back(pair_v);
+                    }
+                }
+            }
+        }
+
+        self.dist[NIL] != INF
+    }
+
+
+    fn dfs(&mut self, u: usize, graph: &BipartiteGraph) -> bool {
+        if u != NIL {
+            for v in &graph.adj_list[u] {
+                let pair_v = self.pair_v[*v];
+                if self.dist[pair_v] == self.dist[u] + 1 {
+                    if self.dfs(pair_v, graph) {
+                        self.pair_v[*v] = u;
+                        self.pair_u[u] = *v;
+                        return true;
+                    }
+                }
+            }
+            self.dist[u] = INF;
+            return false;
+        }
+        true
+    }
+
+    pub fn maximum_matching(&mut self, graph: &BipartiteGraph) -> usize {
+        let mut result = 0;
+
+        while self.bfs(graph) {
+            for u in 1..self.pair_u.len() {
+                if self.pair_u[u] == NIL && self.dfs(u, graph) {
+                    result += 1;
+                }
+            }
+        }
+        result
+    }
 }
 
 fn main() {
@@ -100,101 +169,45 @@ fn main() {
 
     let (n, m) = input.line().pair::<usize>();
 
-    let mut actresses = (0..n)
-        .map(|_| input.string())
-        .collect::<Vec<String>>();
+    let actresses = (1..=n)
+        .map(|i| (input.string(), i))
+        .collect::<HashMap<String, usize>>();
 
-    let mut actors = (0..n)
-        .map(|_| input.string())
-        .collect::<Vec<String>>();
+    let actors = (n + 1..=n + n)
+        .map(|i| (input.string(), i))
+        .collect::<HashMap<String, usize>>();
 
-    let mut movie_casts: Vec<Movies> = Vec::with_capacity(m);
+    let mut graph = BipartiteGraph::with_capacity(n + n + 1); // Ensuring the graph can hold all nodes
 
     for _ in 0..m {
-        let movie_title: String = input.string();
-        let cast_size: usize = input.parse::<usize>();
-        let cast: HashSet<String> = (0..cast_size).map(|_| input.string()).collect::<HashSet<String>>();
+        input.skip();
+        let cast_size: usize = input.parse();
+        let cast: Vec<String> = (0..cast_size)
+            .map(|_| input.string())
+            .collect();
 
-        movie_casts.push(
-            Movies {
-                title: movie_title,
-                cast,
-            });
-    }
-    let first_choice = actresses.first();
-    if first_choice.is_some(){
-        game(&movie_casts, &actresses, &actors, Player::Veronique, "BradPitt");
-    }
-}
+        let mut actress_indices = vec![];
+        let mut actor_indices = vec![];
 
-fn game(movies: &Vec<Movies>, actresses: &Vec<String>, actors: &Vec<String>, player: Player, turn: &str) -> Option<Player> {
-    if actresses.len() == 0 && player == Player::Veronique {
-        Some(Player::Mark)
-    } else if actors.len() == 0 && player == Player::Mark {
-        Some(Player::Veronique)
-    } else if player == Player::Mark {
-        new_new_move(movies, actors, actresses, player, turn)
-    } else {
-        new_new_move(movies, actors, actresses, player, turn)
-    }
-}
-
-fn new_new_move(movies: &Vec<Movies>, possible_actors: &Vec<String>, possible_actresses: &Vec<String>, player: Player, turn: &str) -> Option<Player> {
-    if player == Player::Veronique {
-        for y in possible_actresses {
-            let c = movies
-                .iter()
-                .filter(|m|  m.cast.contains(y) && m.cast.contains(turn)).collect::<Vec<&Movies>>();
-            print!("{}", c.len());
-            if  c.len() > 0{
-                let n =  possible_actresses.clone();
-                n.iter().filter(|x| x.ne(&y));
-                print!("test123") ;
-                let result = game(movies,&n, possible_actors, Player::Mark, y);
-                return result;
+        for cast_member in &cast {
+            if let Some(&index) = actresses.get(cast_member) {
+                actress_indices.push(index);
+            } else if let Some(&index) = actors.get(cast_member) {
+                actor_indices.push(index);
             }
         }
-        return None;
-    } else {
 
-    }
-    None
-}
-
-fn new_movie(movies: &Vec<Movies>, possible_actors: &Vec<String>, possible_actresses: &Vec<String>, turn: Player, all_movies: &Vec<Movies>) {
-    let mut _index: usize = 0;
-    let mut result: Vec<Movies> = vec![];
-    for movie in movies {
-        for actor in possible_actors {
-            if turn == Player::Mark {
-                for possible in possible_actors.iter() {
-                    if actor == possible {
-                        possible_actors.clone().remove(_index);
-                        for m in all_movies.iter() {
-                            if m.cast.contains(actor) {
-                                result.push(m.clone());
-                            }
-                        }
-                        //game(result, possible_actresses.clone(), possible_actors.clone(), "Veronique", all_movies.clone());
-                        break;
-                    }
-                    _index = _index + 1;
-                }
-            } else if turn == Player::Veronique {
-                for possible in possible_actresses.iter() {
-                    if actor == possible {
-                        possible_actresses.clone().remove(_index);
-                        for m in all_movies.iter() {
-                            if m.cast.contains(actor) {
-                                result.push(m.clone());
-                            }
-                        }
-                        //game(result.clone(), possible_actresses.clone(), possible_actors.clone(), "Mark", all_movies.clone());
-                        break;
-                    }
-                    _index = _index + 1;
-                }
+        for &actress_index in &actress_indices {
+            for &actor_index in &actor_indices {
+                graph.add_edge(actress_index, actor_index);
             }
         }
+    }
+
+    let mut hopcroft_karp = HopcroftKarp::with_capacity(n + n);
+    if hopcroft_karp.maximum_matching(&graph) == n {
+        println!("Mark");
+    } else {
+        println!("Veronique");
     }
 }
