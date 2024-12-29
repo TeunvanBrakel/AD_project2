@@ -90,6 +90,7 @@ struct HopcroftKarp {
     dist: Vec<usize>,
 }
 
+
 impl HopcroftKarp {
     fn with_capacity(n: usize) -> Self {
         HopcroftKarp {
@@ -178,7 +179,7 @@ fn main() {
         .collect::<HashMap<String, usize>>();
 
     let mut graph = BipartiteGraph::with_capacity(n + n + 1); // Ensuring the graph can hold all nodes
-
+    let table: Vec<vertex>;
     for _ in 0..m {
         input.skip();
         let cast_size: usize = input.parse();
@@ -206,8 +207,64 @@ fn main() {
 
     let mut hopcroft_karp = HopcroftKarp::with_capacity(n + n);
     if hopcroft_karp.maximum_matching(&graph) == n {
-        println!("Mark");
+        //println!("Mark");
     } else {
-        println!("Veronique");
+       // println!("Veronique");
     }
+
+    let player = input.string();
+    let mut your_score = 0;
+    let mut oponent_score = 0;
+    println!("{}", player);
+    if player == "Mark" {
+        let mut next_move = input.string();
+        while next_move != "IGiveUp" {
+            println!("test");
+            
+            next_move = input.string();
+        } 
+    }else {
+        
+        let mut next_move = input.string();
+        while next_move != "IGiveUp" {
+            println!("test");
+            
+            next_move = input.string();
+        } 
+    }
+    
+}
+
+fn next_move(matrix: lookupTable, your_score: i32, opponent_score: i32, current_move: String){
+    matrix;
+}
+
+struct vertex{
+    current_turn: String,
+    actor_name: String,
+    score: i32,
+}
+
+struct lookupTable{
+    table: Vec<Vec<vertex>>
+}
+
+impl lookupTable{
+    fn add_edge(&mut self, u: usize, v: &vertex) {
+        let mut t = false;
+        for g in self.table[u]{
+            if(g.current_turn == v.current_turn){
+                self.table[u].push(v.to_owned());
+            }
+        }
+        if t == false{
+            self.table[u].push(v.to_owned());
+        }
+    }
+}
+
+
+
+fn test() {
+    println!("test");
 }
