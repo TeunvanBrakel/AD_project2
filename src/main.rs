@@ -65,9 +65,6 @@ impl<'a> Line<'a> {
     }
 }
 
-const NIL: usize = 0; // Using 0 as NIL to represent unmatched nodes
-const INF: usize = usize::MAX;
-
 struct BipartiteGraph {
     adj_list: Vec<Vec<usize>>,
 }
@@ -91,12 +88,15 @@ struct HopcroftKarp {
 }
 
 impl HopcroftKarp {
+    const NIL: usize = 0;
+    const INF: usize = usize::MAX;
+
     fn with_capacity(n: usize) -> Self {
         HopcroftKarp {
             // + 1 for later appended the sink
-            pair_u: vec![NIL; n + 1],
-            pair_v: vec![NIL; n + 1],
-            dist: vec![INF; n + 1],
+            pair_u: vec![Self::NIL; n + 1],
+            pair_v: vec![Self::NIL; n + 1],
+            dist: vec![Self::INF; n + 1],
         }
     }
 
@@ -105,21 +105,21 @@ impl HopcroftKarp {
 
         //Since we can assume left and right are identical otherwise use std:cmp::min(self.pair_u.len(), self.pair_v.len())
         for u in 1..self.pair_u.len() {
-            if self.pair_u[u] == NIL {
+            if self.pair_u[u] == Self::NIL {
                 self.dist[u] = 0;
                 queue.push_back(u);
             } else {
-                self.dist[u] = INF;
+                self.dist[u] = Self::INF;
             }
         }
 
-        self.dist[NIL] = INF;
+        self.dist[Self::NIL] = Self::INF;
 
         while let Some(u) = queue.pop_front() {
-            if self.dist[u] < self.dist[NIL] {
+            if self.dist[u] < self.dist[Self::NIL] {
                 for &v in &graph.adj_list[u] {
                     let pair_v = self.pair_v[v];
-                    if self.dist[pair_v] == INF {
+                    if self.dist[pair_v] == Self::INF {
                         self.dist[pair_v] = self.dist[u] + 1;
                         queue.push_back(pair_v);
                     }
@@ -127,12 +127,11 @@ impl HopcroftKarp {
             }
         }
 
-        self.dist[NIL] != INF
+        self.dist[Self::NIL] != Self::INF
     }
 
-
     fn dfs(&mut self, u: usize, graph: &BipartiteGraph) -> bool {
-        if u != NIL {
+        if u != Self::NIL {
             for v in &graph.adj_list[u] {
                 let pair_v = self.pair_v[*v];
                 if self.dist[pair_v] == self.dist[u] + 1 {
@@ -143,7 +142,7 @@ impl HopcroftKarp {
                     }
                 }
             }
-            self.dist[u] = INF;
+            self.dist[u] = Self::INF;
             return false;
         }
         true
@@ -154,12 +153,16 @@ impl HopcroftKarp {
 
         while self.bfs(graph) {
             for u in 1..self.pair_u.len() {
-                if self.pair_u[u] == NIL && self.dfs(u, graph) {
+                if self.pair_u[u] == Self::NIL && self.dfs(u, graph) {
                     result += 1;
                 }
             }
         }
         result
+    }
+
+    fn perfect_match(&mut self, graph: &BipartiteGraph) -> bool {
+        self.maximum_matching(graph) == self.pair_u.len() - 1
     }
 }
 
@@ -173,11 +176,11 @@ fn main() {
         .map(|i| (input.string(), i))
         .collect::<HashMap<String, usize>>();
 
-    let actors = (n + 1..=n + n)
+    let actors = (1..=n)
         .map(|i| (input.string(), i))
         .collect::<HashMap<String, usize>>();
 
-    let mut graph = BipartiteGraph::with_capacity(n + n + 1); // Ensuring the graph can hold all nodes
+    let mut graph = BipartiteGraph::with_capacity(n + n);
 
     for _ in 0..m {
         input.skip();
@@ -204,8 +207,8 @@ fn main() {
         }
     }
 
-    let mut hopcroft_karp = HopcroftKarp::with_capacity(n + n);
-    if hopcroft_karp.maximum_matching(&graph) == n {
+    let mut hopcroft_karp = HopcroftKarp::with_capacity(n);
+    if hopcroft_karp.perfect_match(&graph) {
         println!("Mark");
     } else {
         println!("Veronique");
