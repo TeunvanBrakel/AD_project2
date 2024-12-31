@@ -65,271 +65,6 @@ impl<'a> Line<'a> {
     }
 }
 
-const NIL: usize = 0; // Using 0 as NIL to represent unmatched nodes
-const INF: usize = usize::MAX;
-
-struct BipartiteGraph {
-    adj_list: Vec<Vec<usize>>,
-}
-
-impl BipartiteGraph {
-    fn with_capacity(n: usize) -> BipartiteGraph {
-        BipartiteGraph {
-            adj_list: vec![vec![]; n],
-        }
-    }
-
-    fn add_edge(&mut self, u: usize, v: usize) {
-        self.adj_list[u].push(v);
-    }
-}
-
-struct HopcroftKarp {
-    pair_u: Vec<usize>,
-    pair_v: Vec<usize>,
-    dist: Vec<usize>,
-}
-
-
-impl HopcroftKarp {
-    fn with_capacity(n: usize) -> Self {
-        HopcroftKarp {
-            // + 1 for later appended the sink
-            pair_u: vec![NIL; n + 1],
-            pair_v: vec![NIL; n + 1],
-            dist: vec![INF; n + 1],
-        }
-    }
-
-    fn bfs(&mut self, graph: &BipartiteGraph) -> bool {
-        let mut queue: VecDeque<usize> = VecDeque::new();
-
-        //Since we can assume left and right are identical otherwise use std:cmp::min(self.pair_u.len(), self.pair_v.len())
-        for u in 1..self.pair_u.len() {
-            if self.pair_u[u] == NIL {
-                self.dist[u] = 0;
-                queue.push_back(u);
-            } else {
-                self.dist[u] = INF;
-            }
-        }
-
-        self.dist[NIL] = INF;
-
-        while let Some(u) = queue.pop_front() {
-            if self.dist[u] < self.dist[NIL] {
-                for &v in &graph.adj_list[u] {
-                    let pair_v = self.pair_v[v];
-                    if self.dist[pair_v] == INF {
-                        self.dist[pair_v] = self.dist[u] + 1;
-                        queue.push_back(pair_v);
-                    }
-                }
-            }
-        }
-
-        self.dist[NIL] != INF
-    }
-
-
-    fn dfs(&mut self, u: usize, graph: &BipartiteGraph) -> bool {
-        if u != NIL {
-            for v in &graph.adj_list[u] {
-                let pair_v = self.pair_v[*v];
-                if self.dist[pair_v] == self.dist[u] + 1 {
-                    if self.dfs(pair_v, graph) {
-                        self.pair_v[*v] = u;
-                        self.pair_u[u] = *v;
-                        return true;
-                    }
-                }
-            }
-            self.dist[u] = INF;
-            return false;
-        }
-        true
-    }
-
-    pub fn maximum_matching(&mut self, graph: &BipartiteGraph) -> usize {
-        let mut result = 0;
-
-        while self.bfs(graph) {
-            for u in 1..self.pair_u.len() {
-                if self.pair_u[u] == NIL && self.dfs(u, graph) {
-                    result += 1;
-                }
-            }
-        }
-        result
-    }
-}
-
-fn main() {
-    let input = stdin();
-    let mut input = Input::new(BufReader::new(input.lock()));
-
-    let (n, m) = input.line().pair::<usize>();
-
-    let actresses = (1..=n)
-        .map(|i| (input.string(), i))
-        .collect::<HashMap<String, usize>>();
-
-    let actors = (n + 1..=n + n)
-        .map(|i| (input.string(), i))
-        .collect::<HashMap<String, usize>>();
-
-    let mut graph = BipartiteGraph::with_capacity(n + n + 1); // Ensuring the graph can hold all nodes
-    let mut lookup = LookupTable { table: Vec::new() };
-
-    for _ in 0..m {
-        input.skip();
-        let cast_size: usize = input.parse();
-        let cast: Vec<String> = (0..cast_size)
-            .map(|_| input.string())
-            .collect();
-
-        let mut actress_indices = vec![];
-        let mut actor_indices = vec![];
-
-        for cast_member in &cast {
-            if let Some(&index) = actresses.get(cast_member) {
-                actress_indices.push(index);
-            } else if let Some(&index) = actors.get(cast_member) {
-                actor_indices.push(index);
-            }
-        }
-
-        for &actress_index in &actress_indices {
-            for &actor_index in &actor_indices {
-                graph.add_edge(actress_index, actor_index);
-                let new_edge1: Vertex = Vertex { current_turn: actress_index, actor_name: actor_index, score: 1 };
-                let new_edge2: Vertex = Vertex { current_turn: actor_index, actor_name: actress_index, score: 1 };
-                lookup.add_edge(actress_index, &new_edge1);
-                lookup.add_edge(actor_index, &new_edge2);
-
-            }
-        }
-    }
-    let mut hopcroft_karp = HopcroftKarp::with_capacity(n + n);
-    if hopcroft_karp.maximum_matching(&graph) == n {
-        //println!("Mark");
-    } else {
-       // println!("Veronique");
-    }
-
-    let player = input.string();
-    let mut your_score = 0;
-    let mut oponent_score = 0;
-    println!("{}", player);
-    if player == "Mark" {
-        let mut next_move = input.string();
-        let mut already_said : Vec<usize> =vec![];
-        let mut turn = 0;
-        let mut winning = true;
-        while next_move != "IGiveUp" {
-            let mut opponent_move: Vertex = Vertex { current_turn: 0, actor_name: 0, score: 0 };
-            let j = actresses.get(&next_move);
-            println!("{:?}", j);
-            if let Some(&j) = j{
-                for h in &lookup.table[j]{
-                    if h.score > opponent_move.score && is_available(&h, &already_said){
-                        opponent_move.actor_name = h.actor_name;
-                        opponent_move.score = h.score;
-                        opponent_move.current_turn = j;
-                    }
-                }
-            }
-            if opponent_move.actor_name == 0{
-                println!("IGiveUp");
-                winning = false;
-            }else{
-                let choiche = actors.iter().find(|(_, &value)| value == opponent_move.actor_name).map(|(key, _)| key);
-                if let Some(choiche) = choiche {
-                    println!("{}", choiche);
-                } else {
-                    println!("No key found with value {}", opponent_move.actor_name);
-                }
-                already_said.push(opponent_move.actor_name);
-                turn += 1;
-                your_score = your_score + opponent_move.score;
-                next_move = input.string();
-            }
-        } 
-        if winning {
-            println!("Final score is {}", your_score / turn);
-        }
-    }else {
-        let mut g = 0;
-        let mut max_score: Vertex = Vertex { current_turn: 0, actor_name: 0, score: 9999999 };
-        while g < n{
-            for h in &lookup.table[g]{
-                if h.score < max_score.score{
-                    max_score.actor_name = h.actor_name;
-                    max_score.score = h.score;
-                    max_score.current_turn = g;
-                }
-            }
-            g += 1;
-        }
-
-
-        let key = actresses.iter().find(|(_, &value)| value == max_score.current_turn).map(|(key, _)| key);
-
-        if let Some(key) = key {
-            println!("{}", key);
-        } else {
-            println!("No key found with value {}", max_score.current_turn);
-        }
-        let mut already_said : Vec<usize> =vec![];
-        already_said.push(max_score.current_turn);
-
-        let mut turn = 0;
-        let mut next_move = input.string();
-        let mut winning = true;
-        while next_move != "IGiveUp" {
-            let mut opponent_move: Vertex = Vertex { current_turn: 0, actor_name: 0, score: 0 };
-            let j = actors.get(&next_move);
-            println!("{:?}", j);
-            if let Some(&j) = j{
-                for h in &lookup.table[j]{
-                    if h.score > opponent_move.score && is_available(&h, &already_said){
-                        opponent_move.actor_name = h.actor_name;
-                        opponent_move.score = h.score;
-                        opponent_move.current_turn = j;
-                    }
-                }
-            }
-            if opponent_move.actor_name == 0{
-                println!("IGiveUp");
-                winning = false;
-            }else{
-                let choiche = actresses.iter().find(|(_, &value)| value == opponent_move.actor_name).map(|(key, _)| key);
-                if let Some(choiche) = choiche {
-                    println!("{}", choiche);
-                } else {
-                    println!("No key found with value {}", opponent_move.actor_name);
-                }
-                already_said.push(opponent_move.actor_name);
-                turn += 1;
-                your_score = your_score + opponent_move.score;
-                next_move = input.string();
-            }
-        } 
-        if winning {
-            println!("Final score is {}", your_score / turn);
-        }
-    }
-    
-}
-
-fn is_available(vertex: &Vertex, list: &Vec<usize>) -> bool {
-    return !list.contains(&vertex.actor_name);
-}
-
-fn next_move(matrix: LookupTable, your_score: i32, opponent_score: i32, current_move: usize){
-    matrix;
-}
-
 #[derive(Clone)]
 #[derive(Debug)]
 struct Vertex{
@@ -371,8 +106,158 @@ impl LookupTable{
     }
 }
 
+//Looks if a possibility was already said in the game
+fn is_available(vertex: &Vertex, list: &Vec<usize>) -> bool {
+    return !list.contains(&vertex.actor_name);
+}
 
+fn print_choice(list: &HashMap<String, usize>, search_value: usize){
+    let choiche = list.iter().find(|(_, &value)| value == search_value).map(|(key, _)| key);
+    if let Some(choiche) = choiche {
+        println!("{}", choiche);
+    } else {
+        println!("No key found with value {}", search_value);
+    }
+}
 
-fn test() {
-    println!("test");
+//Calculate the maximum score if you win in the first turn.
+fn maximum_score(lookup_table: LookupTable, n: usize) -> i32{
+    let mut g = 0;
+    let mut max_score = 0;
+    while g <= 2 * n{
+        for h in &lookup_table.table[g]{
+            if h.score > max_score{
+                max_score = h.score;
+            }
+        }
+        g += 1;
+    }
+    return max_score;
+}
+
+//Returns our next turn based on the opponents turn.
+fn our_next_move(lookup: &LookupTable, already_said: &Vec<usize>, list: &HashMap<String, usize>, opponents_next_move: &String) -> Vertex{
+    let mut opponent_move: Vertex = Vertex { current_turn: 0, actor_name: 0, score: 0 };
+    let j = list.get(opponents_next_move);
+    if let Some(&j) = j{
+        for h in &lookup.table[j]{
+            if h.score > opponent_move.score && is_available(&h, &already_said){
+                opponent_move.actor_name = h.actor_name;
+                opponent_move.score = h.score;
+                opponent_move.current_turn = j;
+            }
+        }
+    }
+    return opponent_move;
+}
+
+fn main() {
+    let input = stdin();
+    let mut input = Input::new(BufReader::new(input.lock()));
+
+    let (n, m) = input.line().pair::<usize>();
+
+    let actresses = (1..=n)
+        .map(|i| (input.string(), i))
+        .collect::<HashMap<String, usize>>();
+
+    let actors = (n + 1..=n + n)
+        .map(|i| (input.string(), i))
+        .collect::<HashMap<String, usize>>();
+
+    let mut lookup = LookupTable { table: Vec::new() };
+
+    for _ in 0..m {
+        input.skip();
+        let cast_size: usize = input.parse();
+        let cast: Vec<String> = (0..cast_size)
+            .map(|_| input.string())
+            .collect();
+
+        let mut actress_indices = vec![];
+        let mut actor_indices = vec![];
+
+        for cast_member in &cast {
+            if let Some(&index) = actresses.get(cast_member) {
+                actress_indices.push(index);
+            } else if let Some(&index) = actors.get(cast_member) {
+                actor_indices.push(index);
+            }
+        }
+
+        for &actress_index in &actress_indices {
+            for &actor_index in &actor_indices {
+                let new_edge1: Vertex = Vertex { current_turn: actress_index, actor_name: actor_index, score: 1 };
+                let new_edge2: Vertex = Vertex { current_turn: actor_index, actor_name: actress_index, score: 1 };
+                lookup.add_edge(actress_index, &new_edge1);
+                lookup.add_edge(actor_index, &new_edge2);
+
+            }
+        }
+    }
+
+    let player = input.string();
+    let mut your_score = 0;
+    let mut already_said : Vec<usize> =vec![];
+    let mut turn = 0;
+    let mut winning = true;
+
+    if player == "Mark" {
+        let mut opponents_next_move = input.string();
+        
+        while opponents_next_move != "IGiveUp" && winning{
+            let our_next_move: Vertex = our_next_move(&lookup, &already_said, &actresses, &opponents_next_move);
+            if our_next_move.actor_name == 0{
+                println!("IGiveUp");
+                winning = false;
+            }else{
+                print_choice(&actors, our_next_move.actor_name);
+                already_said.push(our_next_move.actor_name);
+                turn += 1;
+                your_score = your_score + our_next_move.score;
+                opponents_next_move = input.string();
+            }
+        }
+    }else {
+        let mut g = 0;
+        let mut first_move: Vertex = Vertex { current_turn: 0, actor_name: 0, score: 9999999 };
+        
+        while g < n{
+            for h in &lookup.table[g]{
+                if h.score < first_move.score{
+                    first_move.actor_name = h.actor_name;
+                    first_move.score = h.score;
+                    first_move.current_turn = g;
+                }
+            }
+            g += 1;
+        }
+        print_choice(&actresses, first_move.current_turn);
+        already_said.push(first_move.current_turn);
+        let mut opponents_next_move = input.string();
+        
+        while opponents_next_move != "IGiveUp" && winning{
+            let our_next_move: Vertex = our_next_move(&lookup, &already_said, &actors, &opponents_next_move);
+            if our_next_move.actor_name == 0{
+                println!("IGiveUp");
+                winning = false;
+            }else{
+                print_choice(&actresses, our_next_move.actor_name);
+                already_said.push(our_next_move.actor_name);
+                turn += 1;
+                your_score = your_score + our_next_move.score;
+                opponents_next_move = input.string();
+            }
+        } 
+    }
+
+    if winning {
+        if turn == 0 {
+            println!("Final score is {}", maximum_score(lookup, n));
+        }else{
+            println!("Final score is {}", your_score / turn);
+        }
+    }else{
+        println!("Final score is 0");
+    }
 }
